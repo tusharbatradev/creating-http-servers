@@ -1,13 +1,14 @@
-const http = require("http");
-const fs = require("fs");
+const express = require("express");
 
-const myServer = http.createServer((req, res) => {
-  const log = `${Date.now()}: New Request Recieved\n`;
-  fs.appendFile("log.text", log, (err, data) => {
-    res.end("Hello From Server again");
-  });
-  console.log(req);
-  res.end("Hello from Server");
+const app = express();
+
+app.get('/' , (req,res) => {
+    res.send('Hello World')
 });
 
-myServer.listen(8000, () => console.log("Server Started"));
+app.get('/about', (req, res) => {
+    res.send(`Hello ${req.query.name}`)
+})
+
+const port = 8000
+app.listen(port, console.log(`Server started on ${port}`))
