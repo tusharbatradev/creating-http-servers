@@ -1,16 +1,62 @@
 const express = require("express");
 const users = require("./MOCK_DATA.json");
 const fs = require("fs");
+const mongoose = require("mongoose");
+const { type } = require("os");
+const { timeStamp } = require("console");
 
 const app = express();
 const port = 8000;
 
+// Connection
+mongoose
+  .connect("mongodb://127.0.0.1:27017/practise-app-1")
+  .then(() => console.log("Mongo Connected"))
+  .catch((err) => console.log(err));
+
 app.use(express.urlencoded({ extended: false }));
 
+const userSchema = new mongoose.Schema(
+  {
+    firstName: {
+      type: String,
+      required: true,
+    },
+    lastName: {
+      type: String,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    jobTitle: {
+      type: String,
+    },
+    gender: {
+      type: String,
+    },
+  },
+  { timestamps: true }
+);
+
+const User = mongoose.model("user", userSchema);
+
+app.use((req, res, next) => {
+  console.log("Hello From Middleware 1");
+  next();
+});
+
+app.use((req, res, next) => {
+  console.log("Hello From Middleware 2");
+  next();
+});
+
 // Routes
-app.get("/users", (req, res) => {
+app.get("/users", async (req, res) => {
+  const allDBUsers = await User.find({});
   const html = `<ul> 
-      ${users.map((user) => `<li>${user.first_name}</li>`).join("")}
+      ${allDBUsers.map((user) => `<li>${user.firstName}</li>`).join("")}
       </ul>`;
 
   res.send(html);
@@ -18,11 +64,11 @@ app.get("/users", (req, res) => {
 
 app
   .route("/api/users/:id")
-  .get((req, res) => {
+  .get(async (req, res) => {
     const id = Number(req.params.id);
     console.log("Requested ID:", id);
 
-    const user = users.find((user) => user.id === id);
+    const user = await User.findById(req.params.id);
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -30,41 +76,46 @@ app
 
     res.json(user);
   })
-  .put((req, res) => {
-    const id = Number(req.params.id);
-    console.log("Requested ID:", id);
-
-    // User find karo
-    const userIndex = id - 1;
-
-    users[userIndex] = { ...users[userIndex], ...req.body };
-
-    res.json({ message: "User updated successfully", user: users[userIndex] });
+  .put(async (req, res) => {
+    const user = await User.findById(req.params.id);
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { ...user.toObject(), ...req.body },
+      { new: true }
+    );
+    res.json({
+      msg: "User Updated",
+      user: updatedUser,
+    });
   })
-  .delete((req, res) => {
-    const id = Number(req.params.id);
-    console.log("Requested ID:", id);
+  .delete(async (req, res) => {
+    const deletedUser = await User.findByIdAndDelete(req.params.id);
 
-    const deleteUser = users.splice(id - 1, 1);
-
-    res.json(deleteUser);
+    res.json({
+      msg: "User Deleted",
+      user: deletedUser,
+    });
   });
 
 // Get all users
-app.get("/api/users", (req, res) => {
-  res.json(users);
+app.get("/api/users", async (req, res) => {
+  const allDBUsers = await User.find({});
+  res.json(allDBUsers);
 });
 
 // Post
-app.post("/api/users", (req, res) => {
+app.post("/api/users", async (req, res) => {
   let body = req.body;
 
-  // Generate new ID
-  let newUser = { ...body, id: users.length + 1 };
-  users.push(newUser);
-  fs.writeFile("./MOCK_DATA.json", JSON.stringify(users), (err, data) => {
-    return res.json({ status: "User Added" });
+  const result = await User.create({
+    firstName: body.firstName,
+    lastName: body.lastName,
+    email: body.email,
+    jobTitle: body.jobTitle,
+    gender: body.gender,
   });
+  console.log(result);
+  return res.json({ msg: "Succesfully added" });
 });
 
 app.listen(port, () => {
